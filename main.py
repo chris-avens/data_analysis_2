@@ -2,10 +2,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import mplfinance as mpf
 import plotly.graph_objects as go
+import streamlit as st
 
 
 def main():
-    folder = '.'
+    folder = 'G:/My Drive/FINANCE'
     csv_file = f'{folder}/report_2024-10-18_211441.csv'
     accounts_file = f'{folder}/starting_balance.json'
 
@@ -31,6 +32,15 @@ def main():
     print(running_balance_df.info())
     # plot_running_balance(running_balance_df)
     plot_ohlc(running_balance_df)
+    tabular_df = running_balance_df[['account', 'category', 'amount', 'date', 'cumulative_sum']].copy()
+    st.dataframe(tabular_df)
+    st.title('Table')
+    st.write(tabular_df)
+    cols1 = st.columns(2)
+    for col in cols1:
+        with col:
+            st.write('this is a column')
+
 
 
 def describe_data(data):
@@ -78,16 +88,22 @@ def plot_running_balance(df):
 
 
 def plot_ohlc(df):
-    df['date_only'] = pd.to_datetime(df['date']).dt.date
-    df['month_year'] = pd.to_datetime(df['date']).apply(lambda x: x.strftime('%B-%Y')) 
-    ohlc = df.groupby('month_year').agg(
+    df['date'] = pd.to_datetime(df['date'])
+    df['day'] = df['date'].dt.date
+    df['year'] = df['date'].dt.isocalendar().year
+    df['week'] = df['date'].dt.isocalendar().week
+    df['week_start'] = df['date'] - pd.to_timedelta(df['date'].dt.weekday, unit='D')
+    df['week_start'] = df['week_start'].dt.date
+    df['month_year'] = df['date'].apply(lambda x: x.strftime('%B-%Y'))
+
+    ohlc = df.groupby('week_start').agg(
         Open=('cumulative_sum', 'first'),
         High=('cumulative_sum', 'max'),
         Low=('cumulative_sum', 'min'),
         Close=('cumulative_sum', 'last'),
     )
 
-    ohlc.index = pd.to_datetime(ohlc.index)
+    # ohlc.index = pd.to_datetime(ohlc.index)
 
     # mpf.plot(ohlc, type='candle', style='charles', title='Running Balance', ylabel='Balance', datetime_format='%Y-%m-%d', tight_layout=True)
     fig = go.Figure(data=[go.Candlestick(
@@ -98,16 +114,27 @@ def plot_ohlc(df):
         close=ohlc['Close'],
         # increasing_line_color='green',
         # decreasing_line_color='red',
+        whiskerwidth=0.5,
+        line_width=0.4,
+        hoverlabel_font_size=20,
     )])
 
     fig.update_layout(
         title='Running Balance',
         xaxis_title='Date',
         yaxis_title='Balance',
-        xaxis_rangeslider_visible=True
+        # xaxis_rangeslider_visible=True,
+        # xaxis=dict(
+        #     range=[ohlc.index.min(), ohlc.index.min() + pd.DateOffset(day=2)],
+        #     rangeslider=dict(visible=True),
+        #     type='date',
+        #     fixedrange=False,
+        # ),
+        # dragmode='pan',
     )
 
-    fig.show()
+    # fig.show()
+    st.plotly_chart(fig)
 
 
 if __name__ == '__main__':
