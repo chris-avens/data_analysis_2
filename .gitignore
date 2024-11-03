@@ -2,3 +2,4 @@ env/
 .env
 sample_data.csv
 test.py
+__pycache__/
