@@ -6,8 +6,8 @@ import streamlit as st
 
 
 def main():
-    folder = '.'
-    csv_file = f'{folder}/report_2024-10-18_211441.csv'
+    folder = 'G:/My Drive/FINANCE'
+    csv_file = f'{folder}/report_2024-12-20_231658.csv'
     accounts_file = f'{folder}/starting_balance.json'
 
     transactions_df = pd.read_csv(csv_file, sep=';')
@@ -19,29 +19,15 @@ def main():
     total_starting = accounts_df['starting_balance'].sum()
     running_balance_df = running_balance(active_transactions, total_starting)
 
-    # print_details(details={
-    #     "total_starting": total_starting,
-    #     "accounts_df": accounts_df,
-    #     "transactions_df": transactions_df,
-    #     "accounts_json": accounts_json,
-    #     "running_balance_df": running_balance_df,
-    # })
     create_sidebar()
     plot_ohlc(running_balance_df)
-    tabular_df = running_balance_df[['account', 'category', 'amount', 'date', 'cumulative_sum']].copy()
-    st.dataframe(tabular_df, use_container_width=True)
-    # st.dataframe(active_transactions[["category", "amount"]].groupby("category").count(), use_container_width=True)
-    st.dataframe(
-        active_transactions[["category", "amount"]].groupby("category").agg(
-            Count=("category", "count"),
-            Sum=("amount", "sum"),
-        ), use_container_width=True
-    )
-    # cols1 = st.columns(2)
-    # for col in cols1:
-    #     with col:
-    #         st.write('this is a column')
+    st.dataframe(running_balance_df[['account', 'category', 'amount', 'date', 'cumulative_sum']], use_container_width=True)
+    
+    show_category_stats(active_transactions)
     show_month_detail(active_transactions)
+    show_recurring(active_transactions)
+    show_category_detail(active_transactions)
+    show_account_detail(active_transactions)
 
 
 def create_sidebar():
@@ -174,16 +160,25 @@ def plot_ohlc(df):
         st.plotly_chart(fig)
 
 
-def recurring_df(df, group_list):
-    return (df[group_list].groupby(group_list).size().reset_index(name="count").query("count >= 2"))
+def show_category_stats(df):
+    with st.expander("Category Statistics"):
+        st.title("Category Statistics")
+        st.dataframe(
+            df[["category", "amount"]].groupby("category").agg(
+                Count=("category", "count"),
+                Sum=("amount", "sum"),
+            ), use_container_width=True
+        )
 
 
 def show_month_detail(df):
-    df['date'] = pd.to_datetime(df['date'])
-    df.sort_values("date")
-    df['year_month_label'] = df['date'].apply(lambda x: x.strftime('%B %Y'))
-    df['time'] = df['date'].apply(lambda x: x.strftime('%H:%M'))
-    with st.container(border=True):
+    with st.expander("Month Details"):
+        st.title("Month Details")
+        df['date'] = pd.to_datetime(df['date'])
+        df.sort_values("date")
+        df['year_month_label'] = df['date'].apply(lambda x: x.strftime('%B %Y'))
+        df['time'] = df['date'].apply(lambda x: x.strftime('%H:%M'))
+        # with st.container(border=True):
         month = st.selectbox("Month", df["year_month_label"].unique())
         tabular_df = (df
             [["time", "account", "category", "amount", "note", "labels"]]
@@ -192,6 +187,37 @@ def show_month_detail(df):
         )
         st.dataframe(tabular_df, use_container_width=True)
         st.write(f"Total rows: {tabular_df.count()}")
+
+def show_category_detail(df):
+    with st.expander("Category Details"):
+        st.title("Category Details")
+        category = st.selectbox("Category", sorted(df["category"].unique()))
+        tabular_df = (df
+            [["date", "account", "amount", "note", "labels"]]
+            [df["category"]==category]
+            .sort_values("date")
+        )
+        st.dataframe(tabular_df, use_container_width=True)
+        st.write(f"Total rows: {tabular_df.count()}")
+
+def show_account_detail(df):
+    with st.expander("Account Details"):
+        st.title("Account Details")
+        account = st.selectbox("Account", sorted(df["account"].unique()))
+        tabular_df = (df
+            [["date", "account", "amount", "note", "labels"]]
+            [df["account"]==account]
+            .sort_values("date")
+        )
+        st.dataframe(tabular_df, use_container_width=True)
+        st.write(f"Total rows: {tabular_df.count()}")
+
+def recurring_df(df, group_list):
+    return (df[group_list].groupby(group_list).size().reset_index(name="count").query("count >= 2"))
+
+def show_recurring(df):
+    # with st.container(border=True):
+    with st.expander("Recurring"):
         st.title("Recurring")
         group_lists = [
             ["category", "account", "note", "labels"],
@@ -204,45 +230,6 @@ def show_month_detail(df):
             new_df = recurring_df(df, category_list)
             st.subheader(f"{i}. {", ".join(category_list)} [count={new_df.shape[0]}]")
             st.dataframe(new_df, use_container_width=True)
-            st.divider()
-
-        # df1 = recurring_df(df, ["category", "account", "note", "labels"])
-        # st.subheader(f"1. account, category, note, labels [count={df1.shape[0]}]")
-        # st.dataframe(df1, use_container_width=True)
-        # df2 = (df[["category", "note", "labels"]]
-        #         .groupby(["category", "note", "labels"])
-        #         .size()
-        #         .reset_index(name='count')
-        #         .query('count >= 2'))
-        # st.subheader("2a. category, note, labels")
-        # st.dataframe(df2, use_container_width=True)
-        # st.subheader("2b. account, category, labels")
-        # st.dataframe(
-        #     df[["category", "account", "labels"]]
-        #         .groupby(["category", "account", "labels"])
-        #         .size()
-        #         .reset_index(name='count')
-        #         .query('count >= 2'),
-        #     use_container_width=True
-        # )
-        # st.subheader("3. category, labels")
-        # st.dataframe(
-        #     df[["category", "labels"]]
-        #         .groupby(["category", "labels"])
-        #         .size()
-        #         .reset_index(name='count')
-        #         .query('count >= 2'),
-        #     use_container_width=True
-        # )
-        # st.subheader("4. category")
-        # st.dataframe(
-        #     df[["category"]]
-        #         .groupby(["category"])
-        #         .size()
-        #         .reset_index(name='count')
-        #         .query('count >= 2'),
-        #     use_container_width=True
-        # )
 
 
 if __name__ == '__main__':
